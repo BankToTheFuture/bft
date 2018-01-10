@@ -1,0 +1,42 @@
+{
+  "name": "bttf",
+  "version": "0.0.1",
+  "description": "bttf token",
+  "main": "truffle.js",
+  "scripts": {
+    "test": "./tests.sh"
+  },
+  "keywords": [
+    "solidity",
+    "ethereum",
+    "smart",
+    "contracts",
+    "security",
+    "zeppelin"
+  ],
+  "author": "Mihai Cimpoesu <mihai.cimpoesu@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "babel-polyfill": "^6.26.0",
+    "bip39": "^2.4.0",
+    "bluebird": "^3.5.1",
+    "ethereumjs-wallet": "^0.6.0",
+    "truffle-hdwallet-provider": "github:trufflesuite/truffle-hdwallet-provider",
+    "web3": "^0.20.3",
+    "web3-provider-engine": "^13.4.0"
+  },
+  "devDependencies": {
+    "babel-preset-es2015": "^6.18.0",
+    "babel-preset-stage-2": "^6.18.0",
+    "babel-preset-stage-3": "^6.17.0",
+    "babel-register": "^6.23.0",
+    "chai": "latest",
+    "chai-as-promised": "^7.1.1",
+    "chai-bignumber": "^2.0.2",
+    "coveralls": "^2.13.1",
+    "ethereumjs-testrpc-sc": "6.0.7",
+    "solc": "0.4.19",
+    "solidity-coverage": "^0.2.1",
+    "truffle": "4.0.4"
+  }
+}
