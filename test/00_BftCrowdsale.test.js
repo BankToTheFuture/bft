@@ -45,14 +45,14 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 	const tPreSaleBfPlatform = 300000000;
 	const tCompany = 300000000;
 	const tRewardPool = 200000000;
-	const tshareholders = 100000000;
+	const tShareholders = 100000000;
 	const tTokenSaleCosts = 70000000;
 
 	const tPreMintedSupply =
 		tPreSaleBfPlatform+
 		tCompany+
 		tRewardPool+
-		tshareholders+
+		tShareholders+
 		tTokenSaleCosts;
 
 	let companyHolding2y = null;
@@ -147,7 +147,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should be able to change the etherPrice as an admin', async () => {
 
-		let newEtherPrice = 717.20 * PRICE_MULTIPLIER;
+		let newEtherPrice = 1361.70 * PRICE_MULTIPLIER;
 		await crowdsale.updateEtherPrice(newEtherPrice, {from: ac.admin}).should.be.fulfilled;
 
 		let etherPrice = await crowdsale.etherPrice();
@@ -217,7 +217,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 		b6.should.be.bignumber.equal(0);
 
 		let b7 = wei(await token.balanceOf(shareholdersHolding1y));
-		b7.should.be.bignumber.equal(tshareholders);
+		b7.should.be.bignumber.equal(tShareholders);
 
 		let b8 = wei(await token.balanceOf(ac.tokenSaleCosts));
 		b8.should.be.bignumber.equal(tTokenSaleCosts);
@@ -296,7 +296,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 			ac.buyer1,
 			{
 				from: ac.buyer1,
-				value: ether(1)
+				value: buyerCapEther
 			}
 		)
 		.should.be.rejectedWith(EVMRevert);
@@ -311,13 +311,13 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 			ac.buyer1,
 			{
 				from: ac.buyer1,
-				value: ether(1)
+				value: buyerCapEther
 			}
 		)
 		.should.be.fulfilled;
 
-		let tBought = wei(await token.balanceOf(ac.buyer1));
-		tBought.should.be.bignumber.equal(latestMintRate);
+		let tBought = await token.balanceOf(ac.buyer1);
+		tBought.should.be.bignumber.equal(buyerCapEther.mul(latestMintRate));
 	})
 
 	it('should not be able to change the etherPrice after startTime', async () => {
@@ -353,6 +353,22 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 		.should.be.rejectedWith(EVMRevert);
 	})
 
+	it('should not allow a whitelisted buyer to send less ether than buyerCapEther*0.95', async() => {
+
+		await crowdsale.addWhitelist(ac.buyer2, {from: ac.operator1}).should.be.fulfilled;
+		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer2));
+
+		let under = buyerCapEther.mul(0.95).sub(ether(0.001)).floor();
+		await crowdsale.buyTokens(
+			ac.buyer2,
+			{
+				from: ac.buyer2,
+				value: under,
+			}
+		)
+		.should.be.rejectedWith(EVMRevert);
+	})
+
 	it('should not allow a whitelisted buyer to buy when crowdsale is paused', async() => {
 
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer2));
@@ -375,8 +391,10 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should allow a whitelisted buyer to buy tokens using the fallback function', async() => {
 
+		// should allow the lower limit
+		let low = buyerCapEther.mul(0.95).ceil();
 		await pSendTransaction({
-			value: ether(1.2),
+			value: low,
 			from: ac.buyer2,
 			to: crowdsale.address,
 			gas: 100000
@@ -384,7 +402,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 		.should.be.fulfilled;
 
 		let tBought = wei(await token.balanceOf(ac.buyer2));
-		tBought.should.be.bignumber.equal((new BigNumber(latestMintRate)).mul(1.2));
+		tBought.should.be.bignumber.equal(low.mul(wei(latestMintRate)));
 	})
 
 	it('should allow a whitelisted buyer to buy tokens for a third party - also whitelisted', async() => {
@@ -392,32 +410,42 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 		await crowdsale.addWhitelist(ac.buyer3, {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer3));
 
+		let under = buyerCapEther.mul(0.99).ceil();
 		await crowdsale.buyTokens(
 			ac.buyer3,
 			{
 				from: ac.buyer1,
-				value: ether(1)
+				value: under
 			}
 		)
 		.should.be.fulfilled;
 
 		let tBought = wei(await token.balanceOf(ac.buyer3));
-		tBought.should.be.bignumber.equal(latestMintRate);
+		tBought.should.be.bignumber.equal(under.mul(wei(latestMintRate)));
 	})
 
 	it('should have correctly received the funds to the crowdsale wallet', async() => {
 		let balance = await pGetBalance(ac.crowdsaleWallet);
 
-		let balanceShouldBe = crowdsaleWalletBalanceBefore.add(ether(3.2));
+		let low = buyerCapEther.mul(0.95).ceil();
+		let under = buyerCapEther.mul(0.99).ceil();
+		let total = buyerCapEther.add(low).add(under);
+
+		let balanceShouldBe = crowdsaleWalletBalanceBefore.add(total);
 		balance.should.be.bignumber.equal(balanceShouldBe);
 	})
 
 	it('should have correctly calculated the totalSupply and weiRaised', async () => {
-		let totalSupply = wei(await token.totalSupply());
-		totalSupply.should.be.bignumber.equal(tPreMintedSupply+3.2*latestMintRate);
+
+		let low = buyerCapEther.mul(0.95).ceil();
+		let under = buyerCapEther.mul(0.99).ceil();
+		let total = buyerCapEther.add(low).add(under);
+
+		let totalSupply = await token.totalSupply();
+		totalSupply.should.be.bignumber.equal(ether(tPreMintedSupply).add(total.mul(latestMintRate)));
 
 		let weiRaised = await crowdsale.weiRaised();
-		weiRaised.should.be.bignumber.equal(ether(3.2));
+		weiRaised.should.be.bignumber.equal(total);
 	})
 
 	it('should not release tokens to shareholders account for 1 year', async () => {
@@ -430,8 +458,8 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 		await increaseTimeTo(startTime+duration.years(1));
 		await th.release().should.be.fulfilled;
 
-		let tshareholdersBalance = wei(await token.balanceOf(ac.shareholders));
-		tshareholdersBalance.should.be.bignumber.equal(tshareholders);
+		let tShareholdersBalance = wei(await token.balanceOf(ac.shareholders));
+		tShareholdersBalance.should.be.bignumber.equal(tShareholders);
 
 		let tHolding = wei(await token.balanceOf(shareholdersHolding1y));
 		tHolding.should.be.bignumber.equal(0);

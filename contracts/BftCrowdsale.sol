@@ -126,8 +126,9 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	// @return true if investors can buy at the moment
 	function validPurchase() whenNotPaused
 	internal view returns (bool) {
-		bool withinBuyerCap = msg.value <= buyerCapEther;
-		return super.validPurchase() && withinBuyerCap;
+		bool underMaxBuyerCap = msg.value <= buyerCapEther;
+		bool underLowBuyerCap = msg.value >= (buyerCapEther.sub(buyerCapEther.div(20)));
+		return super.validPurchase() && underLowBuyerCap && underMaxBuyerCap;
 	}
 
 	// overriding Crowdsale#buyTokens to check and mark the address in 'bought' array
