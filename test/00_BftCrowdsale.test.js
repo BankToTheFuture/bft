@@ -230,28 +230,62 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 	})
 
 	it('should not allow a non-operator to add/rem to the whitelist', async () => {
-		await crowdsale.addWhitelist(ac.buyer1, {from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
+		await crowdsale.addWhitelist([ac.buyer1], {from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
 		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer1), 'buyer1 should not be whitelisted');
-		await crowdsale.remWhitelist(ac.buyer1, {from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
+		await crowdsale.remWhitelist([ac.buyer1], {from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
 	})
 
 	it('should allow operator to add/rem to the whitelist', async () => {
-		await crowdsale.addWhitelist(ac.buyer1, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer1), 'buyer1 should be whitelisted');
 
-		await crowdsale.remWhitelist(ac.buyer1, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.remWhitelist([ac.buyer1], {from: ac.operator1}).should.be.fulfilled;
 		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer1), 'buyer1 should not be whitelisted');
 	})
 
+	it('should allow operator to add/rem multiple beneficiaries to the whitelist', async () => {
+		await crowdsale.addWhitelist(
+			[
+				ac.buyer1,
+				ac.buyer2,
+				ac.buyer3,
+				ac.buyer4,
+				ac.buyer5
+			],
+			{from: ac.operator1}
+		).should.be.fulfilled;
+		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer1), 'buyer1 should be whitelisted');
+		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer2), 'buyer2 should be whitelisted');
+		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer3), 'buyer3 should be whitelisted');
+		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer4), 'buyer4 should be whitelisted');
+		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer5), 'buyer5 should be whitelisted');
+
+		await crowdsale.remWhitelist(
+			[
+				ac.buyer1,
+				ac.buyer2,
+				ac.buyer3,
+				ac.buyer4,
+				ac.buyer5,
+			],
+			{from: ac.operator1}
+		).should.be.fulfilled;
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer1), 'buyer1 should not be whitelisted');
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer2), 'buyer2 should not be whitelisted');
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer3), 'buyer3 should not be whitelisted');
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer4), 'buyer4 should not be whitelisted');
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer5), 'buyer5 should not be whitelisted');
+	})
+
 	it('should allow owner/admin to change operator', async () => {
-		await crowdsale.addWhitelist(ac.buyer2, {from: ac.operator2}).should.be.rejectedWith(EVMRevert);
+		await crowdsale.addWhitelist([ac.buyer2], {from: ac.operator2}).should.be.rejectedWith(EVMRevert);
 
 		await crowdsale.changeOperator(ac.operator2, {from: ac.admin}).should.be.fulfilled;
 		let op = await crowdsale.operator();
 		assert.equal(op, ac.operator2, "didn't set the correct address for operator2");
 
-		await crowdsale.addWhitelist(ac.buyer2, {from: ac.operator2}).should.be.fulfilled;
-		await crowdsale.remWhitelist(ac.buyer2, {from: ac.operator2}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer2], {from: ac.operator2}).should.be.fulfilled;
+		await crowdsale.remWhitelist([ac.buyer2], {from: ac.operator2}).should.be.fulfilled;
 
 		// put ac.operator1 back as operator
 		await crowdsale.changeOperator(ac.operator1, {from: ac.admin}).should.be.fulfilled;
@@ -259,10 +293,10 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should stop adding to whitelist if crowdsale is paused', async () => {
 		await crowdsale.pause({from: ac.admin}).should.be.fulfilled;
-		await crowdsale.addWhitelist(ac.buyer1, {from: ac.operator1}).should.be.rejectedWith(EVMRevert);
+		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.rejectedWith(EVMRevert);
 
 		await crowdsale.unpause({from: ac.admin}).should.be.fulfilled;
-		await crowdsale.addWhitelist(ac.buyer1, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer1));
 	})
 
@@ -289,7 +323,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should not allow a whitelisted buyer to buy tokens before the startTime', async() => {
 
-		await crowdsale.addWhitelist(ac.buyer1, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer1));
 
 		await crowdsale.buyTokens(
@@ -340,7 +374,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should not allow a whitelisted buyer to buy more tokens than the buyerCapEther', async() => {
 
-		await crowdsale.addWhitelist(ac.buyer2, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer2], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer2));
 
 		await crowdsale.buyTokens(
@@ -355,7 +389,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should not allow a whitelisted buyer to send less ether than buyerCapEther*0.95', async() => {
 
-		await crowdsale.addWhitelist(ac.buyer2, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer2], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer2));
 
 		let under = buyerCapEther.mul(0.95).sub(ether(0.001)).floor();
@@ -407,7 +441,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 	it('should allow a whitelisted buyer to buy tokens for a third party - also whitelisted', async() => {
 
-		await crowdsale.addWhitelist(ac.buyer3, {from: ac.operator1}).should.be.fulfilled;
+		await crowdsale.addWhitelist([ac.buyer3], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer3));
 
 		let under = buyerCapEther.mul(0.99).ceil();

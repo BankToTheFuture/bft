@@ -36,8 +36,6 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	// address permissioned to whitelist public sale addresses
 	address public operator;
 	mapping(address => bool) whitelist;
-	event LogAddWhitelist(address beneficiary, address operator);
-	event LogRemWhitelist(address beneficiary, address operator);
 	event LogOperatorChange(address newOperator);
 
 	mapping(address => bool) bought;
@@ -148,14 +146,16 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		return new BftToken(tokenCap, tokenDecimals, this);
 	}
 
-	function addWhitelist(address beneficiary) onlyOperator whenNotPaused public {
-		whitelist[beneficiary] = true;
-		LogAddWhitelist(beneficiary, msg.sender);
+	function addWhitelist(address[] beneficiaries) onlyOperator whenNotPaused public {
+		for (uint i = 0; i < beneficiaries.length; i++) {
+			whitelist[beneficiaries[i]] = true;
+		}
 	}
 
-	function remWhitelist(address beneficiary) onlyOperator whenNotPaused public {
-		whitelist[beneficiary] = false;
-		LogRemWhitelist(beneficiary, msg.sender);
+	function remWhitelist(address[] beneficiaries) onlyOperator whenNotPaused public {
+		for (uint i = 0; i < beneficiaries.length; i++) {
+			whitelist[beneficiaries[i]] = false;
+		}
 	}
 
 	function isWhitelisted(address beneficiary) view public returns(bool) {
