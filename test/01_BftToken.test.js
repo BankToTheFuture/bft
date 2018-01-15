@@ -118,19 +118,15 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await myToken.burn(ether(0.5), {from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
 	})
 
-	it('should not allow a token holder to redeeem before token is paused', async() => {
+	it('should not allow a token holder to redeem before token is paused', async() => {
 		await myToken.redeem({from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
-	})
-
-	it('should not allow upgrading if unpaused', async() => {
-		await myToken.upgrade(newToken.address, {from: ac.admin}).should.be.rejectedWith(EVMRevert);
 	})
 
 	it('should not allow pausing from a non-owner', async() => {
 		await myToken.pause({from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
 	})
 
-	it('should not allow a token holder to redeeem before having an upgrade token', async() => {
+	it('should not allow a token holder to redeem before having an upgrade token', async() => {
 		await myToken.redeem({from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
 	})
 
@@ -143,9 +139,12 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await myToken.increaseApproval(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.decreaseApproval(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.transferFrom(ac.buyer4, ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
+
+		await myToken.unpause({from: ac.admin}).should.be.fulfilled;
+		assert.isFalse(await myToken.paused());
 	})
 
-	it('should allow upgrading after paused', async() => {
+	it('should allow upgrading even if not paused', async() => {
 		assert.equal(await myToken.newToken(), NULL_ADDRESS);
 		await myToken.upgrade(newToken.address, {from: ac.admin}).should.be.fulfilled;
 		assert.equal(await myToken.newToken(), newToken.address);
@@ -153,8 +152,7 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await newToken.transferOwnership(myToken.address, {from: ac.admin});
 	})
 
-	it('should allow a token holder to redeeem after we have an upgrade token and paused', async() => {
-		assert.isTrue(await myToken.paused());
+	it('should allow a token holder to redeem after we have an upgrade token', async() => {
 
 		let b0 = await myToken.balanceOf(ac.buyer1);
 		await myToken.redeem({from: ac.buyer1}).should.be.fulfilled;
@@ -166,15 +164,15 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		b2.should.be.bignumber.equal(b0);
 	})
 
-	it('should allow a non-token holder to redeeem ', async() => {
+	it('should allow a non-token holder to redeem ', async() => {
 		await myToken.redeem({from: ac.intruder1}).should.be.fulfilled;
 	})
 
-	it('should allow a token holders to redeeem twice - allow redeedm with 0 balance', async() => {
+	it('should allow a token holders to redeem twice - allow redeem with 0 balance', async() => {
 		await myToken.redeem({from: ac.buyer1}).should.be.fulfilled;
 	})
 
-	it('should allow all token holders to redeeem ', async() => {
+	it('should allow all token holders to redeem ', async() => {
 		let totalSupply = await myToken.totalSupply();
 		totalSupply.should.be.bignumber.equal(ether(15-1.2)); // 1.2 redeemed before by buyer1
 

@@ -33,7 +33,7 @@ contract BftToken is DetailedERC20, CappedToken, BurnableToken, PausableToken {
 		_;
 	}
 
-	function upgrade(MintableToken _newToken) whenPaused onlyOwner public {
+	function upgrade(MintableToken _newToken) onlyOwner public {
 		newToken = _newToken;
 	}
 
@@ -43,7 +43,7 @@ contract BftToken is DetailedERC20, CappedToken, BurnableToken, PausableToken {
 		_value = _value; // to silence compiler warning
 	}
 
-	function redeem() whenPaused hasUpgrade public {
+	function redeem() hasUpgrade public {
 
 		var balance = balanceOf(msg.sender);
 
