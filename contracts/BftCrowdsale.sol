@@ -10,8 +10,9 @@ import {BftToken}  from './BftToken.sol';
 
 contract BftCrowdsale is CappedCrowdsale, Pausable {
 
-	uint256 public constant tokenCap = 1000000000 ether; // ether is a multiplier here 10 ** 18
 	uint8 public constant tokenDecimals = 18;
+	uint256 public constant etherInWei = 10**uint256(tokenDecimals);
+	uint256 public constant tokenCap = 1000000000 * etherInWei;
 
 	uint256 public constant SALE_CAP_USD = 3000000;
 	uint256 public constant BUYER_CAP_USD = 1000;
@@ -19,8 +20,8 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	uint256 public constant TOKENS_PER_USD = 10;
 
 	uint256 public etherPrice = PRICE_MULTIPLIER;
-	uint256 public buyerCapEther = 1 ether;
-	uint256 public saleCapEther = 1 ether;
+	uint256 public buyerCapEther = etherInWei;
+	uint256 public saleCapEther = etherInWei;
 	uint256 public mintRate = TOKENS_PER_USD;
 
 	address public preSaleBfPlatform;
@@ -98,8 +99,8 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		require(now < startTime);
 
 		etherPrice = _price;
-		buyerCapEther = BUYER_CAP_USD.mul(1 ether).mul(PRICE_MULTIPLIER).div(etherPrice);
-		saleCapEther = SALE_CAP_USD.mul(1 ether).mul(PRICE_MULTIPLIER).div(etherPrice);
+		buyerCapEther = BUYER_CAP_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
+		saleCapEther = SALE_CAP_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
 		mintRate = TOKENS_PER_USD.mul(etherPrice).div(PRICE_MULTIPLIER);
 
 		// update vars on parent contracts
@@ -113,11 +114,11 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	}
 
 	function preMintTokens() internal {
-		token.mint(preSaleBfPlatform, 300000000 ether);
-		token.mint(companyHolding2y, 300000000 ether);
-		token.mint(rewardPool, 200000000 ether);
-		token.mint(shareholdersHolding1y, 100000000 ether);
-		token.mint(tokenSaleCosts, 70000000 ether);
+		token.mint(preSaleBfPlatform, 300000000 * etherInWei);
+		token.mint(companyHolding2y, 300000000 * etherInWei);
+		token.mint(rewardPool, 200000000 * etherInWei);
+		token.mint(shareholdersHolding1y, 100000000 * etherInWei);
+		token.mint(tokenSaleCosts, 70000000 * etherInWei);
 	}
 
 	// overriding CappedCrowdsale#validPurchase to add extra buyerCapEther logic
