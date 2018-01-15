@@ -318,7 +318,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 	it('should not allow a non-whitelisted buyer to send buy tokens', async() => {
 
 		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer2));
-		await crowdsale.buyTokens(ac.buyer2, {from: ac.buyer2, value: ether(1)}).should.be.rejectedWith(EVMRevert);
+		await crowdsale.buyTokens(ac.buyer2, {from: ac.buyer2, value: buyerCapEther}).should.be.rejectedWith(EVMRevert);
 	})
 
 	it('should not allow a whitelisted buyer to buy tokens before the startTime', async() => {
@@ -352,6 +352,8 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 		let tBought = await token.balanceOf(ac.buyer1);
 		tBought.should.be.bignumber.equal(buyerCapEther.mul(latestMintRate));
+
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer1));
 	})
 
 	it('should not be able to change the etherPrice after startTime', async () => {
@@ -366,7 +368,7 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 			ac.buyer1,
 			{
 				from: ac.buyer1,
-				value: ether(0.1)
+				value: buyerCapEther
 			}
 		)
 		.should.be.rejectedWith(EVMRevert);
@@ -437,12 +439,18 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 		let tBought = wei(await token.balanceOf(ac.buyer2));
 		tBought.should.be.bignumber.equal(low.mul(wei(latestMintRate)));
+
+		// should now be removed from the whitelist
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer2));
 	})
 
-	it('should allow a whitelisted buyer to buy tokens for a third party - also whitelisted', async() => {
+	it('should allow a NON-whitelisted buyer to buy tokens for a third party', async() => {
 
 		await crowdsale.addWhitelist([ac.buyer3], {from: ac.operator1}).should.be.fulfilled;
 		assert.isTrue(await crowdsale.isWhitelisted(ac.buyer3));
+
+		// the sender does NOT have to be whitelisted
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer1));
 
 		let under = buyerCapEther.mul(0.99).ceil();
 		await crowdsale.buyTokens(
@@ -456,6 +464,9 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 
 		let tBought = wei(await token.balanceOf(ac.buyer3));
 		tBought.should.be.bignumber.equal(under.mul(wei(latestMintRate)));
+
+		// beneficiary should now be removed from the whitelist
+		assert.isFalse(await crowdsale.isWhitelisted(ac.buyer3));
 	})
 
 	it('should have correctly received the funds to the crowdsale wallet', async() => {

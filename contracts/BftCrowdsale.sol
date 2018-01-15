@@ -39,8 +39,6 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	mapping(address => bool) whitelist;
 	event LogOperatorChange(address newOperator);
 
-	mapping(address => bool) bought;
-
 	modifier onlyOperator() {
 		require(msg.sender == operator);
 		_;
@@ -48,11 +46,6 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 
 	modifier onlyWhitelisted(address _address) {
 		require(whitelist[_address]);
-		_;
-	}
-
-	modifier didNotBuy(address beneficiary) {
-		require(bought[beneficiary] == false);
 		_;
 	}
 
@@ -132,13 +125,13 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 
 	// overriding Crowdsale#buyTokens to check and mark the address in 'bought' array
 	function buyTokens(address beneficiary)
-	didNotBuy(beneficiary)
-	onlyWhitelisted(msg.sender)
 	onlyWhitelisted(beneficiary)
 	whenNotPaused
 	public payable {
 		super.buyTokens(beneficiary);
-		bought[beneficiary] = true;
+
+		// remove buyer from the whitelist
+		whitelist[beneficiary] = false;
 	}
 
 	// creates the token to be sold.
@@ -161,10 +154,6 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 
 	function isWhitelisted(address beneficiary) view public returns(bool) {
 		return whitelist[beneficiary];
-	}
-
-	function hasAlreadyBought(address beneficiary) view public returns(bool) {
-		return bought[beneficiary];
 	}
 
 	function changeOperator(address _operator) onlyOwner whenNotPaused public {
