@@ -291,9 +291,9 @@ contract('00_BftCrowdsale.sol', function(rpc_accounts) {
 		await crowdsale.changeOperator(ac.operator1, {from: ac.admin}).should.be.fulfilled;
 	})
 
-	it('should stop adding to whitelist if crowdsale is paused', async () => {
+	it('should NOT stop adding/removing to/from whitelist if crowdsale is paused', async () => {
 		await crowdsale.pause({from: ac.admin}).should.be.fulfilled;
-		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.rejectedWith(EVMRevert);
+		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.fulfilled;
 
 		await crowdsale.unpause({from: ac.admin}).should.be.fulfilled;
 		await crowdsale.addWhitelist([ac.buyer1], {from: ac.operator1}).should.be.fulfilled;

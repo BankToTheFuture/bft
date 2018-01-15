@@ -140,13 +140,13 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		return new BftToken(tokenCap, tokenDecimals, this);
 	}
 
-	function addWhitelist(address[] beneficiaries) onlyOperator whenNotPaused public {
+	function addWhitelist(address[] beneficiaries) onlyOperator public {
 		for (uint i = 0; i < beneficiaries.length; i++) {
 			whitelist[beneficiaries[i]] = true;
 		}
 	}
 
-	function remWhitelist(address[] beneficiaries) onlyOperator whenNotPaused public {
+	function remWhitelist(address[] beneficiaries) onlyOperator public {
 		for (uint i = 0; i < beneficiaries.length; i++) {
 			whitelist[beneficiaries[i]] = false;
 		}
@@ -156,7 +156,7 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		return whitelist[beneficiary];
 	}
 
-	function changeOperator(address _operator) onlyOwner whenNotPaused public {
+	function changeOperator(address _operator) onlyOwner public {
 		operator = _operator;
 		LogOperatorChange(operator);
 	}
