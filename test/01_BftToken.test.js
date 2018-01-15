@@ -166,12 +166,12 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		b2.should.be.bignumber.equal(b0);
 	})
 
-	it('should not allow a non-token holder to redeeem ', async() => {
-		await myToken.redeem({from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
+	it('should allow a non-token holder to redeeem ', async() => {
+		await myToken.redeem({from: ac.intruder1}).should.be.fulfilled;
 	})
 
-	it('should not allow a token holders to redeeem twice', async() => {
-		await myToken.redeem({from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
+	it('should allow a token holders to redeeem twice - allow redeedm with 0 balance', async() => {
+		await myToken.redeem({from: ac.buyer1}).should.be.fulfilled;
 	})
 
 	it('should allow all token holders to redeeem ', async() => {

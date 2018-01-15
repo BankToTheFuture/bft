@@ -46,7 +46,6 @@ contract BftToken is DetailedERC20, CappedToken, BurnableToken, PausableToken {
 	function redeem() whenPaused hasUpgrade public {
 
 		var balance = balanceOf(msg.sender);
-		require(balance>0);
 
 		// burn the tokens in this token smart contract
 		super.burn(balance);
