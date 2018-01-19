@@ -5,16 +5,16 @@ import {PausableToken} from '../zeppelin/contracts/token/PausableToken.sol';
 import {CappedToken} from '../zeppelin/contracts/token/CappedToken.sol';
 import {MintableToken} from '../zeppelin/contracts/token/MintableToken.sol';
 import {BurnableToken} from '../zeppelin/contracts/token/BurnableToken.sol';
-import {Crowdsale} from '../zeppelin/contracts/crowdsale/Crowdsale.sol';
+import {CappedCrowdsale} from '../zeppelin/contracts/crowdsale/CappedCrowdsale.sol';
 
 contract BftToken is DetailedERC20, CappedToken, BurnableToken, PausableToken {
 
-	Crowdsale public crowdsale;
+	CappedCrowdsale public crowdsale;
 
 	function BftToken(
 		uint256 _tokenCap,
 		uint8 _decimals,
-		Crowdsale _crowdsale
+		CappedCrowdsale _crowdsale
 	)
 		DetailedERC20("BF Token", "BFT", _decimals)
 		CappedToken(_tokenCap) public {
@@ -59,12 +59,12 @@ contract BftToken is DetailedERC20, CappedToken, BurnableToken, PausableToken {
 	// we override the token transfer functions to block transfers before startTransfersDate timestamp
 
 	modifier canDoTransfers() {
-		require(now >= startTransfersTime());
+		require(hasCrowdsaleFinished());
 		_;
 	}
 
-	function startTransfersTime() public view returns (uint256) {
-		return crowdsale.endTime();
+	function hasCrowdsaleFinished() view public returns(bool) {
+		return crowdsale.hasEnded();
 	}
 
 	function transfer(address _to, uint256 _value) public canDoTransfers returns (bool) {
@@ -85,5 +85,16 @@ contract BftToken is DetailedERC20, CappedToken, BurnableToken, PausableToken {
 
 	function decreaseApproval(address _spender, uint _subtractedValue) public canDoTransfers returns (bool success) {
 		return super.decreaseApproval(_spender, _subtractedValue);
+	}
+
+	// ----------------------------------------------------------------------------------------------------------------
+	// functionality to change the token ticker - in case of conflict
+
+	function changeSymbol(string _symbol) onlyOwner public {
+		symbol = _symbol;
+	}
+
+	function changeName(string _name) onlyOwner public {
+		name = _name;
 	}
 }

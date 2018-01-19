@@ -20,7 +20,7 @@ const BftToken = artifacts.require("../contracts/BftToken.sol");
 const MintableToken = artifacts.require("../zeppelin/contracts/token/MintableToken.sol");
 const Crowdsale = artifacts.require("../zeppelin/contracts/crowdsale/Crowdsale.sol");
 
-contract('01_BftToken.sol', function(rpc_accounts) {
+contract('02_BftToken.sol', function(rpc_accounts) {
 
 	let ac = accounts(rpc_accounts);
 	console.log(JSON.stringify(ac, null, 2));
@@ -68,8 +68,8 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		newToken = await MintableToken.new({from: ac.admin, gas: 7000000});
 		console.log("newToken.address= " +newToken.address);
 
-		let startTransfersTime = await myToken.startTransfersTime();
-		startTransfersTime.should.be.bignumber.equal(endTime, 'The startTransfersDate timestamp is incorrect');
+		let canStartTransfers = await myToken.hasCrowdsaleFinished();
+		assert.isFalse(canStartTransfers, "should not be able to start transfers now");
 	})
 
 	it('should be able mint some tokens to my buyers', async () => {
@@ -94,7 +94,7 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		b5.should.be.bignumber.equal(ether(5));
 	})
 
-	it('should not allow ERC20 interface use before startTransfersTime', async() => {
+	it('should not allow ERC20 interface use before end of crowdsale', async() => {
 		await myToken.transfer(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.approve(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.increaseApproval(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
@@ -102,15 +102,15 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await myToken.transferFrom(ac.buyer4, ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 	})
 
-	it('should allow ERC20 interface use after startTransfersTime', async() => {
-		await increaseTimeTo(endTime);
+	it('should allow ERC20 interface use after end of crowdsale', async() => {
+		await increaseTimeTo(endTime+1);
+		assert.isTrue(await crowdsale.hasEnded());
 
 		await myToken.transfer(ac.buyer1, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
 		await myToken.approve(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
 
 		await myToken.increaseApproval(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
 		await myToken.decreaseApproval(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
-
 		await myToken.transferFrom(ac.buyer4, ac.buyer1, ether(0.1),{from: ac.buyer5}).should.be.fulfilled;
 	})
 
@@ -186,5 +186,16 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 
 		let newTotalSupply = await newToken.totalSupply();
 		newTotalSupply.should.be.bignumber.equal(ether(15));
+	})
+
+	it('should allow owner to change symbol and name of token contract', async() => {
+		await myToken.changeSymbol("TTT", {from: ac.admin});
+		await myToken.changeName("TTT Token", {from: ac.admin});
+
+		let symbol = await myToken.symbol();
+		let name = await myToken.name();
+
+		assert.equal(symbol, "TTT");
+		assert.equal(name, "TTT Token");
 	})
 });

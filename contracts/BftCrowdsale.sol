@@ -14,14 +14,17 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	uint256 public constant etherInWei = 10**uint256(tokenDecimals);
 	uint256 public constant tokenCap = 1000000000 * etherInWei;
 
-	uint256 public constant SALE_CAP_USD = 3000000;
-	uint256 public constant BUYER_CAP_USD = 1000;
+	uint256 public SALE_CAP_USD;
+	uint256 public BUYER_CAP_LOW_USD;
+	uint256 public BUYER_CAP_HIGH_USD;
+
 	uint256 public constant PRICE_MULTIPLIER = 100;
 	uint256 public constant TOKENS_PER_USD = 10;
 
 	uint256 public etherPrice = PRICE_MULTIPLIER;
-	uint256 public buyerCapEther = etherInWei;
-	uint256 public saleCapEther = etherInWei;
+	uint256 public buyerCapLowEther = etherInWei;
+	uint256 public buyerCapHighEther = etherInWei;
+	uint256 public saleHardCapEther = etherInWei;
 	uint256 public mintRate = TOKENS_PER_USD;
 
 	address public preSaleBfPlatform;
@@ -35,12 +38,14 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 	TokenTimelock public shareholdersHolding1y;
 
 	// address permissioned to whitelist public sale addresses
-	address public operator;
 	mapping(address => bool) whitelist;
-	event LogOperatorChange(address newOperator);
+
+	mapping(address => bool) operators;
+	event LogOperatorAdd(address newOperator);
+	event LogOperatorRem(address newOperator);
 
 	modifier onlyOperator() {
-		require(msg.sender == operator);
+		require(operators[msg.sender]);
 		_;
 	}
 
@@ -63,9 +68,14 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		address _tokenSaleCosts,
 
 		// owner of the whitelist function
-		address _operator
+		address _operator,
+		address _admin,
+
+		uint256 _saleCapUsd,
+		uint256 _buyerCapLowUsd,
+		uint256 _buyerCapHighUsd
 	)
-		CappedCrowdsale(saleCapEther)
+		CappedCrowdsale(saleHardCapEther)
 		Crowdsale(_startTime, _endTime, mintRate, _wallet) public {
 
 		require(_preSaleBfPlatform != address(0x0));
@@ -75,16 +85,23 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		require(_tokenSaleCosts != address(0x0));
 		require(_operator != address(0x0));
 
+		SALE_CAP_USD = _saleCapUsd;
+		BUYER_CAP_LOW_USD = _buyerCapLowUsd;
+		BUYER_CAP_HIGH_USD = _buyerCapHighUsd;
+
 		preSaleBfPlatform = _preSaleBfPlatform;
 		company = _company;
 		rewardPool = _rewardPool;
 		shareholders = _shareholders;
 		tokenSaleCosts = _tokenSaleCosts;
-		operator = _operator;
 
+		addOperator(_operator);
 		updateEtherPrice(_etherPrice);
 		createHoldings();
 		preMintTokens();
+
+		// transfer ownership the the admin multi-sig
+		transferOwnership(_admin);
 	}
 
 	function updateEtherPrice(uint256 _price) onlyOwner public {
@@ -92,12 +109,13 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		require(now < startTime);
 
 		etherPrice = _price;
-		buyerCapEther = BUYER_CAP_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
-		saleCapEther = SALE_CAP_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
+		buyerCapLowEther = BUYER_CAP_LOW_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
+		buyerCapHighEther = BUYER_CAP_HIGH_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
+		saleHardCapEther = SALE_CAP_USD.mul(etherInWei).mul(PRICE_MULTIPLIER).div(etherPrice);
 		mintRate = TOKENS_PER_USD.mul(etherPrice).div(PRICE_MULTIPLIER);
 
 		// update vars on parent contracts
-		cap = saleCapEther;
+		cap = saleHardCapEther;
 		rate = mintRate;
 	}
 
@@ -114,24 +132,36 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		token.mint(tokenSaleCosts, 70000000 * etherInWei);
 	}
 
-	// overriding CappedCrowdsale#validPurchase to add extra buyerCapEther logic
+	function checkSaleEnded() internal {
+		// if no further purchases are possible due to lower buyer cap
+		if(saleHardCapEther.sub(weiRaised) < buyerCapLowEther) {
+			token.mint(rewardPool, tokenCap.sub(token.totalSupply()));
+		}
+	}
+
+	// overriding CappedCrowdsale#validPurchase to add extra low/high limits logic
 	// @return true if investors can buy at the moment
 	function validPurchase() whenNotPaused
 	internal view returns (bool) {
-		bool underMaxBuyerCap = msg.value <= buyerCapEther;
-		bool underLowBuyerCap = msg.value >= (buyerCapEther.sub(buyerCapEther.div(20)));
-		return super.validPurchase() && underLowBuyerCap && underMaxBuyerCap;
+		bool aboveLowBuyerCap = (msg.value >= buyerCapLowEther);
+		bool underMaxBuyerCap = (msg.value <= buyerCapHighEther);
+		return super.validPurchase() && aboveLowBuyerCap && underMaxBuyerCap;
 	}
 
-	// overriding Crowdsale#buyTokens to check and mark the address in 'bought' array
+	// overriding Crowdsale#hasEnded to add token cap logic
+	// @return true if crowdsale event has ended
+	function hasEnded() public view returns (bool) {
+		bool tokenCapReached = token.totalSupply() == tokenCap;
+		return super.hasEnded() || tokenCapReached;
+	}
+
 	function buyTokens(address beneficiary)
 	onlyWhitelisted(beneficiary)
 	whenNotPaused
 	public payable {
+		require(token.balanceOf(beneficiary)==0);
 		super.buyTokens(beneficiary);
-
-		// remove buyer from the whitelist
-		whitelist[beneficiary] = false;
+		checkSaleEnded();
 	}
 
 	// creates the token to be sold.
@@ -156,13 +186,25 @@ contract BftCrowdsale is CappedCrowdsale, Pausable {
 		return whitelist[beneficiary];
 	}
 
-	function changeOperator(address _operator) onlyOwner public {
-		operator = _operator;
-		LogOperatorChange(operator);
+	function addOperator(address _operator) onlyOwner public {
+		operators[_operator] = true;
+		LogOperatorAdd(_operator);
 	}
 
-	// this should only be done at the end of the sale, but works as emergency also
+	function remOperator(address _operator) onlyOwner public {
+		operators[_operator] = false;
+		LogOperatorAdd(_operator);
+	}
+
+	function isOperator(address _operator) view public returns(bool) {
+		return operators[_operator];
+	}
+
 	function transferTokenOwnership(address _newOwner) onlyOwner public {
+		// only allow transfer at the end of the sale
+		require(hasEnded());
+		// stop the minting process on the token as we only allow the crowdsale to mint
+		token.finishMinting();
 		token.transferOwnership(_newOwner);
 	}
 }
