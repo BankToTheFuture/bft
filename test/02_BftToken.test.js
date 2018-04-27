@@ -20,7 +20,7 @@ const BftToken = artifacts.require("../contracts/BftToken.sol");
 const MintableToken = artifacts.require("../zeppelin/contracts/token/MintableToken.sol");
 const Crowdsale = artifacts.require("../zeppelin/contracts/crowdsale/Crowdsale.sol");
 
-contract('01_BftToken.sol', function(rpc_accounts) {
+contract('02_BftToken.sol', function(rpc_accounts) {
 
 	let ac = accounts(rpc_accounts);
 	console.log(JSON.stringify(ac, null, 2));
@@ -68,8 +68,8 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		newToken = await MintableToken.new({from: ac.admin, gas: 7000000});
 		console.log("newToken.address= " +newToken.address);
 
-		let startTransfersTime = await myToken.startTransfersTime();
-		startTransfersTime.should.be.bignumber.equal(endTime, 'The startTransfersDate timestamp is incorrect');
+		let canStartTransfers = await myToken.hasCrowdsaleFinished();
+		assert.isFalse(canStartTransfers, "should not be able to start transfers now");
 	})
 
 	it('should be able mint some tokens to my buyers', async () => {
@@ -94,7 +94,7 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		b5.should.be.bignumber.equal(ether(5));
 	})
 
-	it('should not allow ERC20 interface use before startTransfersTime', async() => {
+	it('should not allow ERC20 interface use before end of crowdsale', async() => {
 		await myToken.transfer(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.approve(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.increaseApproval(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
@@ -102,15 +102,15 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await myToken.transferFrom(ac.buyer4, ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 	})
 
-	it('should allow ERC20 interface use after startTransfersTime', async() => {
-		await increaseTimeTo(endTime);
+	it('should allow ERC20 interface use after end of crowdsale', async() => {
+		await increaseTimeTo(endTime+1);
+		assert.isTrue(await crowdsale.hasEnded());
 
 		await myToken.transfer(ac.buyer1, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
 		await myToken.approve(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
 
 		await myToken.increaseApproval(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
 		await myToken.decreaseApproval(ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.fulfilled;
-
 		await myToken.transferFrom(ac.buyer4, ac.buyer1, ether(0.1),{from: ac.buyer5}).should.be.fulfilled;
 	})
 
@@ -118,19 +118,15 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await myToken.burn(ether(0.5), {from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
 	})
 
-	it('should not allow a token holder to redeeem before token is paused', async() => {
+	it('should not allow a token holder to redeem before token is paused', async() => {
 		await myToken.redeem({from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
-	})
-
-	it('should not allow upgrading if unpaused', async() => {
-		await myToken.upgrade(newToken.address, {from: ac.admin}).should.be.rejectedWith(EVMRevert);
 	})
 
 	it('should not allow pausing from a non-owner', async() => {
 		await myToken.pause({from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
 	})
 
-	it('should not allow a token holder to redeeem before having an upgrade token', async() => {
+	it('should not allow a token holder to redeem before having an upgrade token', async() => {
 		await myToken.redeem({from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
 	})
 
@@ -143,9 +139,12 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await myToken.increaseApproval(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.decreaseApproval(ac.intruder2, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
 		await myToken.transferFrom(ac.buyer4, ac.buyer5, ether(0.1),{from: ac.buyer4}).should.be.rejectedWith(EVMRevert);
+
+		await myToken.unpause({from: ac.admin}).should.be.fulfilled;
+		assert.isFalse(await myToken.paused());
 	})
 
-	it('should allow upgrading after paused', async() => {
+	it('should allow upgrading even if not paused', async() => {
 		assert.equal(await myToken.newToken(), NULL_ADDRESS);
 		await myToken.upgrade(newToken.address, {from: ac.admin}).should.be.fulfilled;
 		assert.equal(await myToken.newToken(), newToken.address);
@@ -153,8 +152,7 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		await newToken.transferOwnership(myToken.address, {from: ac.admin});
 	})
 
-	it('should allow a token holder to redeeem after we have an upgrade token and paused', async() => {
-		assert.isTrue(await myToken.paused());
+	it('should allow a token holder to redeem after we have an upgrade token', async() => {
 
 		let b0 = await myToken.balanceOf(ac.buyer1);
 		await myToken.redeem({from: ac.buyer1}).should.be.fulfilled;
@@ -166,15 +164,15 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 		b2.should.be.bignumber.equal(b0);
 	})
 
-	it('should not allow a non-token holder to redeeem ', async() => {
-		await myToken.redeem({from: ac.intruder1}).should.be.rejectedWith(EVMRevert);
+	it('should allow a non-token holder to redeem ', async() => {
+		await myToken.redeem({from: ac.intruder1}).should.be.fulfilled;
 	})
 
-	it('should not allow a token holders to redeeem twice', async() => {
-		await myToken.redeem({from: ac.buyer1}).should.be.rejectedWith(EVMRevert);
+	it('should allow a token holders to redeem twice - allow redeem with 0 balance', async() => {
+		await myToken.redeem({from: ac.buyer1}).should.be.fulfilled;
 	})
 
-	it('should allow all token holders to redeeem ', async() => {
+	it('should allow all token holders to redeem ', async() => {
 		let totalSupply = await myToken.totalSupply();
 		totalSupply.should.be.bignumber.equal(ether(15-1.2)); // 1.2 redeemed before by buyer1
 
@@ -188,5 +186,16 @@ contract('01_BftToken.sol', function(rpc_accounts) {
 
 		let newTotalSupply = await newToken.totalSupply();
 		newTotalSupply.should.be.bignumber.equal(ether(15));
+	})
+
+	it('should allow owner to change symbol and name of token contract', async() => {
+		await myToken.changeSymbol("TTT", {from: ac.admin});
+		await myToken.changeName("TTT Token", {from: ac.admin});
+
+		let symbol = await myToken.symbol();
+		let name = await myToken.name();
+
+		assert.equal(symbol, "TTT");
+		assert.equal(name, "TTT Token");
 	})
 });

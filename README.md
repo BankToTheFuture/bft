@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/BankToTheFuture/bft.svg?branch=audit-response)](https://travis-ci.org/BankToTheFuture/bft)
+
 # BFT smart contracts
 
 The repo has 2 main contracts, BftCrowdsale and BftToken. Please follow the unit-tests and compare to specs.
