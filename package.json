@@ -36,7 +36,7 @@
     "chai-bignumber": "^2.0.2",
     "ethereumjs-testrpc-sc": "6.0.7",
     "solc": "0.4.19",
-    "solidity-coverage": "^0.2.1",
-    "truffle": "4.0.4"
+    "solidity-coverage": "^0.5.4",
+    "truffle": "4.1.10"
   }
 }
